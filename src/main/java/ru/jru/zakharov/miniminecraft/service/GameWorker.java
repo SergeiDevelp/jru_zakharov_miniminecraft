@@ -1,7 +1,9 @@
 package ru.jru.zakharov.miniminecraft.service;
 
+import ru.jru.zakharov.miniminecraft.config.Setting;
 import ru.jru.zakharov.miniminecraft.entity.Game;
 import lombok.RequiredArgsConstructor;
+import ru.jru.zakharov.miniminecraft.view.View;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -11,31 +13,34 @@ import java.util.concurrent.TimeUnit;
 
 @RequiredArgsConstructor
 public class GameWorker extends Thread {
-    public static final int PERIOD = 1000;
     private final Game game;
+    private final int PERIOD = Setting.get().getPeriod();
 
     @Override
     public void run() {
+        View view = game.getView();
+        view.showMap();
+        view.showStatistics();
         ScheduledExecutorService mainPool = Executors.newScheduledThreadPool(4);
 
-        List<OrganismWorker> workers = game.getEntityFactory().getAllPrototypes()
+        List<OrganismWorker> workers = game
+                .getEntityFactory()
+                .getAllPrototypes()
                 .stream()
-                .map(p -> new OrganismWorker(p, game.getGameField()))
+                .map(o -> new OrganismWorker(o, game.getGameField()))
                 .toList();
-
         mainPool.scheduleAtFixedRate(() -> {
             ExecutorService servicePool = Executors.newFixedThreadPool(4);
             workers.forEach(servicePool::submit);
             servicePool.shutdown();
-
             try {
                 if (servicePool.awaitTermination(PERIOD, TimeUnit.MILLISECONDS)) {
-                    game.getView().showMap();
-                    game.getView().showStatistics();
+                    view.showMap();
+                    view.showStatistics();
                 }
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-        }, PERIOD, PERIOD, TimeUnit.MILLISECONDS); //TODO need config
+        }, PERIOD, PERIOD, TimeUnit.MILLISECONDS);
     }
 }
